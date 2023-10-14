@@ -11,7 +11,7 @@ If it doesn't work game might have received updates.
 # Source Code
 You'll need some dependency .dll files, import them to your project or code won't work:
 
-    BepInEx.dll from BepInEx/core
-    0Harmony.dll from BepInEx/core
-    Assembly-CSharp.dll from H3VR_Data/Managed
-    UnityEngine.dll from H3VR_Data/Managed
+* BepInEx.dll from BepInEx/core
+* 0Harmony.dll from BepInEx/core
+* Assembly-CSharp.dll from H3VR_Data/Managed
+* UnityEngine.dll from H3VR_Data/Managed
