@@ -5,7 +5,7 @@ This mod I've made for H3VR does the following when playing take and hold game m
 3. Allows you to reroll items for free(can be enabled and disabled in .cfg file).
 4. Allows you to change cost of upgrading magazines(can be configured in .cfg file).
 
-Note: This mod was written in 13/10/2023.
+Note: This mod was written on 13/10/2023.
 If it doesn't work game might have received updates so mod might need to be updated as well.
 
 # Source Code
