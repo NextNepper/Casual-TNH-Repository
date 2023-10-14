@@ -1,4 +1,5 @@
-﻿using System.Reflection;
+﻿using System.Collections.Generic;
+using System.Reflection;
 using UnityEngine;
 using BepInEx;
 using BepInEx.Configuration;
@@ -6,246 +7,232 @@ using BepInEx.Logging;
 using HarmonyLib;
 using FistVR;
 
-
-[BepInPlugin("Nepper.CasualTNH", "Casual TNH", "1.0.0")]
-public class Casual_TNH : BaseUnityPlugin
+namespace Casual_TNH
 {
-    private static Casual_TNH casual_tnh;
-    private static ManualLogSource LoggerInstance;
-    private static ConfigEntry<int> TokenMultiplier;
-    private static ConfigEntry<bool> ShortenAnalyzePhases;
-    private static ConfigEntry<bool> IsRerollFree;
-    private static ConfigEntry<bool> ModifiedMagCostsEnabled;
-    private static ConfigEntry<string> MagUpgradeType;
-    private static ConfigEntry<int> MagUpgradeValue;
-    private Harmony harmony;
-
-    void Awake()
+    [BepInPlugin("Nepper.CasualTNH", "Casual TNH", "1.0.0")]
+    public class Casual_TNH : BaseUnityPlugin
     {
-        casual_tnh = this;
-        LoggerInstance = Logger;
-        TokenMultiplier = Config.Bind("Token Multiplier", "Token gains multiplied by: ", 5, "The multiplier for token modification. Set it to 1 if you don't want to use this. Integer values only.");
-        ShortenAnalyzePhases = Config.Bind("Shorter Analyze Phases", "Enabled: ", true, "If analyze phases should be shortened or not. Set it to false if you don't want to use this. Boolean values only.");
-        IsRerollFree = Config.Bind("Reroll Costs", "Rerolls cost nothing: ", true, "If rerolls should be free or not. Set it to false if you don't want to use this. Boolean values only.");
-        ModifiedMagCostsEnabled = Config.Bind("Magazine Upgrade Costs", "Change magazine upgrade costs: ", true, "If mod's magazine upgrade feature should be enabled or not. Set it to false if you don't want to use this feature of the mod. Boolean values only.");
-        MagUpgradeType = Config.Bind("Magazine Costs", "Magazine upgrade cost type: ", "Flat", "How you want to use \"Magazine upgrade cost\" value to calculate magazine upgrade costs. Set it to either \"Flat\" or \"Multiplier\". String values only.");
-        MagUpgradeValue = Config.Bind("Magazine Costs", "Magazine upgrade cost: ", 0, "The value to used for calculating magazine upgrade costs. Integer values only.");
-        harmony = new Harmony("Nepper.CasualTNH");
-        harmony.PatchAll();
-    }
+        private static Casual_TNH casual_tnh;
+        private static ManualLogSource LoggerInstance;
+        private static ConfigEntry<int> MagUpgradeValue;
+        private static ConfigEntry<string> MagUpgradeType;
+        private static ConfigEntry<bool> ModifiedMagCostsEnabled;
+        private static ConfigEntry<bool> ShortenAnalyzePhases;
+        private static ConfigEntry<bool> IsRerollFree;
+        private static ConfigEntry<int> TokenMultiplier;
+        private Harmony harmony;
 
-    [HarmonyPatch(typeof(TNH_Manager), "AddTokens")]
-    class TokenModifierPatch
-    {
-        static bool Prefix(ref TNH_Manager __instance, int i, bool Scorethis)
+        void Awake()
         {
-            // Successfully patched AddTokens method
-            LoggerInstance.LogInfo("Casual TNH: Patching AddTokens method!");
-
-            // Read the multiplier value from the configuration
-            int Modifier = TokenMultiplier.Value;
-
-            // Use reflection to access and modify the private variable m_numTokens
-            FieldInfo m_numTokensField = typeof(TNH_Manager).GetField("m_numTokens", BindingFlags.NonPublic | BindingFlags.Instance);
-            if (m_numTokensField != null)
-            {
-                int? currentNullableValue = (int?)m_numTokensField.GetValue(__instance);
-                if (currentNullableValue.HasValue)
-                {
-                    int currentValue = currentNullableValue.Value;
-                    LoggerInstance.LogInfo("Casual TNH: Token's you'd get without this mod: " + i);
-                    currentValue += i * Modifier;
-                    LoggerInstance.LogInfo("Casual TNH: Token's you are going to get with this mod: " + i * Modifier);
-                    m_numTokensField.SetValue(__instance, currentValue);
-                    if (Scorethis)
-                    {
-                        __instance.Increment(8, i, false);
-                    }
-                    __instance.OnTokenCountChange(currentValue);
-                }
-            }
-            LoggerInstance.LogInfo("Casual TNH: Patched AddTokens method!");
-            
-            return false;
+            casual_tnh = this;
+            LoggerInstance = Logger;
+            MagUpgradeValue = Config.Bind("Magazine Upgrade Costs", "Magazine_upgrade_cost", 0, "Value to used for calculating magazine upgrade costs.");
+            MagUpgradeType = Config.Bind("Magazine Upgrade Costs", "Magazine_upgrade_cost_type", "Flat", "How you want to use \"Magazine_upgrade_cost\" value to calculate magazine upgrade costs. Set it to either \"Flat\" or \"Multiplier\".");
+            ModifiedMagCostsEnabled = Config.Bind("Magazine Upgrade Costs", "Change_magazine_upgrade_costs", true, "If mod's magazine upgrade feature should be enabled or not. Set it to false if you don't want to use this.");
+            ShortenAnalyzePhases = Config.Bind("Shorter Analyze Phases", "Enabled", true, "If analyze phases should be shortened or not. Set it to false if you don't want to use this.");
+            IsRerollFree = Config.Bind("Reroll Costs", "Rerolls_cost_nothing", true, "If rerolls should be free or not. Set it to false if you don't want to use this.");
+            TokenMultiplier = Config.Bind("Token Multiplier", "Token_gains_multiplied_by", 5, "Multiplier for token modification. Set it to 1 if you don't want to use this.");
+            harmony = new Harmony("Nepper.CasualTNH");
+            harmony.PatchAll();
         }
-    }
 
-    [HarmonyPatch(typeof(TNH_HoldPoint), "BeginAnalyzing")]
-    class ModifyBeginAnalyzingPatch
-    {
-        static bool Prefix(ref TNH_HoldPoint __instance)
+        [HarmonyPatch(typeof(TNH_Manager), "AddTokens")]
+        class TokenModifierPatch
         {
-            bool ShorterAnalyze = ShortenAnalyzePhases.Value;
-            if (ShorterAnalyze)
+            static bool Prefix(ref TNH_Manager __instance, int i, bool Scorethis)
             {
-                LoggerInstance.LogInfo("Casual TNH: Beginning to patch BeginAnalyzing method.");
+                LoggerInstance.LogInfo("Patching AddTokens method!");
+                int Modifier = TokenMultiplier.Value;
 
-                __instance.M.EnqueueLine(TNH_VoiceLineID.AI_AnalyzingSystem);
-
-                FieldInfo m_stateField = typeof(TNH_HoldPoint).GetField("m_state", BindingFlags.NonPublic | BindingFlags.Instance);
-                m_stateField.SetValue(__instance, TNH_HoldPoint.HoldState.Analyzing);
-
-                FieldInfo m_curPhaseField = typeof(TNH_Manager).GetField("m_curPhase", BindingFlags.NonPublic | BindingFlags.Instance);
-                TNH_HoldChallenge.Phase phaseInstance = (TNH_HoldChallenge.Phase)m_curPhaseField.GetValue(__instance);
-
-                Type phaseType = typeof(TNH_HoldChallenge.Phase);
-                float scantime = (float)phaseType.GetProperty("ScanTime").GetValue(phaseInstance);
-
-                FieldInfo m_tickDownToIdentificationField = typeof(TNH_HoldPoint).GetField("m_tickDownToIdentification", BindingFlags.NonPublic | BindingFlags.Instance);
-                m_tickDownToIdentificationField.SetValue(__instance, UnityEngine.Random.Range(scantime * 0.24f, scantime * 0.26f));
-                if (__instance.M.TargetMode == TNHSetting_TargetMode.NoTargets)
+                FieldInfo m_numTokensField = typeof(TNH_Manager).GetField("m_numTokens", BindingFlags.NonPublic | BindingFlags.Instance);
+                if (m_numTokensField != null)
                 {
-                    m_tickDownToIdentificationField.SetValue(__instance, UnityEngine.Random.Range(scantime * 0.24f, scantime * 0.26f) + 1f);
+                    int? currentNullableValue = (int?)m_numTokensField.GetValue(__instance);
+                    if (currentNullableValue.HasValue)
+                    {
+                        int currentValue = currentNullableValue.Value;
+                        LoggerInstance.LogInfo("Token's you would get without this mod: " + i);
+                        currentValue += i * Modifier;
+                        LoggerInstance.LogInfo("Token's you are going to get with this mod: " + i * Modifier);
+                        m_numTokensField.SetValue(__instance, currentValue);
+                        if (Scorethis)
+                        {
+                            __instance.Increment(8, i, false);
+                        }
+                        __instance.OnTokenCountChange(currentValue);
+                    }
                 }
-                else if (__instance.M.IsBigLevel)
-                {
-                    float m_tickdowntoidentification = (float)m_tickDownToIdentificationField.GetValue(__instance);
-                    m_tickdowntoidentification += 1f;
-                    m_tickDownToIdentificationField.SetValue(__instance, m_tickdowntoidentification);
-                }
-
-                __instance.SpawnPoints_Targets.Shuffle<Transform>();
-
-                FieldInfo m_validSpawnPointsField = typeof(TNH_HoldPoint).GetField("m_validSpawnPoints", BindingFlags.NonPublic | BindingFlags.Instance);
-                List<Transform> m_validspawnpoints = (List<Transform>)m_validSpawnPointsField.GetValue(__instance);
-                m_validspawnpoints.Shuffle<Transform>();
-                m_validSpawnPointsField.SetValue(__instance, m_validspawnpoints);
-
-                MethodInfo SpawnWarpInMarkersMethod = typeof(TNH_HoldPoint).GetMethod("SpawnWarpInMarkers", BindingFlags.NonPublic | BindingFlags.Instance);
-                SpawnWarpInMarkersMethod.Invoke(__instance, null);
-
-                FieldInfo m_systemNodeField = typeof(TNH_HoldPoint).GetField("m_systemNode", BindingFlags.NonPublic | BindingFlags.Instance);
-                TNH_HoldPointSystemNode m_systemnode = (TNH_HoldPointSystemNode)m_systemNodeField.GetValue(__instance);
-                m_systemnode.SetNodeMode(TNH_HoldPointSystemNode.SystemNodeMode.Analyzing);
-                m_systemNodeField.SetValue(__instance, m_systemnode);
-
-                LoggerInstance.LogInfo("Casual TNH: BeginAnalyzing method is patched.");
+                LoggerInstance.LogInfo("Patched AddTokens method!");
 
                 return false;
             }
-            LoggerInstance.LogInfo("Casual TNH: Skipped patching BeginAnalyzing method.");
-            return true;
         }
-    }
 
-    [HarmonyPatch(typeof(TNH_ObjectConstructor), "ButtonClicked_Reroll")]
-    class ModifyRerollCost
-    {
-        static bool Prefix(ref TNH_ObjectConstructor __instance, int which)
+        [HarmonyPatch(typeof(TNH_HoldPoint), "BeginAnalyzing")]
+        class ModifyBeginAnalyzingPatch
         {
-            bool isRerollFree = IsRerollFree.Value;
-            if (isRerollFree)
+            static void Postfix(ref TNH_HoldPoint __instance)
             {
-                LoggerInstance.LogInfo("Casual TNH: Beginning to patch ButtonClicked_Reroll method.");
-                int num = 0;
-                if (__instance.M.GetNumTokens() >= num)
+                bool ShorterAnalyze = ShortenAnalyzePhases.Value;
+                if (ShorterAnalyze)
                 {
-                    SM.PlayCoreSound(FVRPooledAudioType.UIChirp, __instance.AudEvent_Select, __instance.transform.position);
-                    __instance.M.RegenerateConstructor(__instance, which);
-                    __instance.M.SubtractTokens(num);
-                    
-                    FieldInfo m_poolAddedCostField = typeof(TNH_ObjectConstructor).GetField("m_poolAddedCost", BindingFlags.NonPublic | BindingFlags.Instance);
-                    if (m_poolAddedCostField != null)
+                    LoggerInstance.LogInfo("Beginning Postfix of BeginAnalyzing method.");
+                    FieldInfo m_curPhaseField = typeof(TNH_Manager).GetField("m_curPhase", BindingFlags.NonPublic | BindingFlags.Instance);
+                    if(m_curPhaseField == null)
                     {
-                        List<int> m_pooladdedcost = (List<int>)m_poolAddedCostField.GetValue(__instance);
-                        m_pooladdedcost[which] = 0;
-                        m_poolAddedCostField.SetValue(__instance, m_pooladdedcost);
+                        LoggerInstance.LogInfo("m_curPhaseField is null, something is wrong.");
                     }
-
-                    MethodInfo updateTokenDisplayMethod = typeof(TNH_ObjectConstructor).GetMethod("UpdateTokenDisplay", BindingFlags.NonPublic | BindingFlags.Instance);
-                    if (updateTokenDisplayMethod != null)
+                    TNH_HoldChallenge.Phase m_curphase = (TNH_HoldChallenge.Phase)m_curPhaseField.GetValue(__instance);
+                    if (m_curphase == null)
                     {
-                        updateTokenDisplayMethod.Invoke(__instance, new object[] { __instance.M.GetNumTokens() });
+                        LoggerInstance.LogInfo("m_curphase is null, something is wrong.");
                     }
+                    float scantime = m_curphase.ScanTime;
 
-                    return false;
+                    FieldInfo m_tickDownToIdentificationField = typeof(TNH_HoldPoint).GetField("m_tickDownToIdentification", BindingFlags.NonPublic | BindingFlags.Instance);
+                    if (m_tickDownToIdentificationField == null)
+                    {
+                        LoggerInstance.LogInfo("m_tickDownToIdentificationField is null, something is wrong.");
+                    }
+                    float newscantime = UnityEngine.Random.Range(scantime * 0.32f, scantime * 0.34f) + 1f;
+                    m_tickDownToIdentificationField.SetValue(__instance, newscantime);
+
+                    LoggerInstance.LogInfo("Ending Postfix of BeginAnalyzing method.");
+                    return;
                 }
-                SM.PlayCoreSound(FVRPooledAudioType.UIChirp, __instance.AudEvent_Fail, __instance.transform.position);
-                LoggerInstance.LogInfo("Casual TNH: ButtonClicked_Reroll method is patched.");
-                return false;
+                LoggerInstance.LogInfo("Skipped Postfix of BeginAnalyzing method.");
             }
-            LoggerInstance.LogInfo("Casual TNH: Skipped patching ButtonClicked_Reroll method.");
-            return true;
         }
-    }
 
-    [HarmonyPatch(typeof(TNH_MagDuplicator), "Button_Upgrade")]
-    class ModifyMagazineUpgradeCost
-    {
-        static bool Prefix(ref TNH_MagDuplicator __instance)
+        [HarmonyPatch(typeof(TNH_ObjectConstructor), "ButtonClicked_Reroll")]
+        class ModifyRerollCost
         {
-            bool isModifiedMagCostsEnabled = ModifiedMagCostsEnabled.Value;
-            if (isModifiedMagCostsEnabled)
+            static bool Prefix(ref TNH_ObjectConstructor __instance, int which)
             {
-                LoggerInstance.LogInfo("Casual TNH: Beginning to patch Button_Upgrade method.");
-                string Cost_Type = MagUpgradeType.Value;
-                int Cost_Value = MagUpgradeValue.Value;
+                bool isRerollFree = IsRerollFree.Value;
+                if (isRerollFree)
+                {
+                    LoggerInstance.LogInfo("Beginning to patch ButtonClicked_Reroll method.");
+                    int num = 0;
+                    if (__instance.M.GetNumTokens() >= num)
+                    {
+                        SM.PlayCoreSound(FVRPooledAudioType.UIChirp, __instance.AudEvent_Select, __instance.transform.position);
+                        __instance.M.RegenerateConstructor(__instance, which);
+                        __instance.M.SubtractTokens(num);
 
-                FieldInfo m_detectedMagField = typeof(TNH_MagDuplicator).GetField("m_detectedMag", BindingFlags.NonPublic | BindingFlags.Instance);
-                FVRFireArmMagazine m_detectedmag = (FVRFireArmMagazine)m_detectedMagField.GetValue(__instance);
-                if (Cost_Type == "Flat")
-                {
-                    if (__instance.M.GetNumTokens() < Cost_Value)
-                    {
-                        SM.PlayCoreSound(FVRPooledAudioType.UIChirp, __instance.AudEvent_Fail, __instance.transform.position);
+                        FieldInfo m_poolAddedCostField = typeof(TNH_ObjectConstructor).GetField("m_poolAddedCost", BindingFlags.NonPublic | BindingFlags.Instance);
+                        if (m_poolAddedCostField != null)
+                        {
+                            List<int> m_pooladdedcost = (List<int>)m_poolAddedCostField.GetValue(__instance);
+                            m_pooladdedcost[which] = 0;
+                            m_poolAddedCostField.SetValue(__instance, m_pooladdedcost);
+                        }
+
+                        MethodInfo updateTokenDisplayMethod = typeof(TNH_ObjectConstructor).GetMethod("UpdateTokenDisplay", BindingFlags.NonPublic | BindingFlags.Instance);
+                        if (updateTokenDisplayMethod != null)
+                        {
+                            updateTokenDisplayMethod.Invoke(__instance, new object[] { __instance.M.GetNumTokens() });
+                        }
+
+                        LoggerInstance.LogInfo("ButtonClicked_Reroll method is patched.");
                         return false;
                     }
+                    SM.PlayCoreSound(FVRPooledAudioType.UIChirp, __instance.AudEvent_Fail, __instance.transform.position);
+                    LoggerInstance.LogInfo("ButtonClicked_Reroll method is patched.");
+                    return false;
                 }
-                if (Cost_Type == "Multiplier")
+                LoggerInstance.LogInfo("Skipped patching ButtonClicked_Reroll method.");
+                return true;
+            }
+        }
+
+        [HarmonyPatch(typeof(TNH_MagDuplicator), "Button_Upgrade")]
+        class ModifyMagazineUpgradeCost
+        {
+            static bool Prefix(ref TNH_MagDuplicator __instance)
+            {
+                bool isModifiedMagCostsEnabled = ModifiedMagCostsEnabled.Value;
+                if (isModifiedMagCostsEnabled)
                 {
-                    if (__instance.M.GetNumTokens() < 3 * Cost_Value)
+                    LoggerInstance.LogInfo("Beginning to patch Button_Upgrade method.");
+                    string Cost_Type = MagUpgradeType.Value;
+                    int Cost_Value = MagUpgradeValue.Value;
+
+                    FieldInfo m_detectedMagField = typeof(TNH_MagDuplicator).GetField("m_detectedMag", BindingFlags.NonPublic | BindingFlags.Instance);
+                    if (m_detectedMagField == null)
                     {
-                        SM.PlayCoreSound(FVRPooledAudioType.UIChirp, __instance.AudEvent_Fail, __instance.transform.position);
-                        return false;
+                        LoggerInstance.LogInfo("m_detectedMagField is null, something is wrong.");
                     }
-                }
-                if (__instance.M.GetNumTokens() < 0)
-                {
-                    SM.PlayCoreSound(FVRPooledAudioType.UIChirp, __instance.AudEvent_Fail, __instance.transform.position);
-                    return false;
-                }
-                if (m_detectedmag == null)
-                {
-                    SM.PlayCoreSound(FVRPooledAudioType.UIChirp, __instance.AudEvent_Fail, __instance.transform.position);
-                    return false;
-                }
-                if (!IM.CompatMags.ContainsKey(m_detectedmag.MagazineType))
-                {
-                    SM.PlayCoreSound(FVRPooledAudioType.UIChirp, __instance.AudEvent_Fail, __instance.transform.position);
-                    return false;
-                }
-                List<FVRObject> list = IM.CompatMags[m_detectedmag.MagazineType];
-                FVRObject fvrobject = null;
-                int num = 10000;
-                for (int i = 0; i < list.Count; i++)
-                {
-                    if (!(list[i].ItemID == m_detectedmag.ObjectWrapper.ItemID) && list[i].MagazineCapacity > m_detectedmag.m_capacity && list[i].MagazineCapacity < num)
+                    FVRFireArmMagazine m_detectedmag = (FVRFireArmMagazine)m_detectedMagField.GetValue(__instance);
+                    if (m_detectedmag == null)
                     {
-                        fvrobject = list[i];
-                        num = list[i].MagazineCapacity;
+                        LoggerInstance.LogInfo("m_detectedmag is null, something is wrong.");
                     }
-                }
-                if (fvrobject != null)
-                {
+
                     if (Cost_Type == "Flat")
                     {
-                        __instance.M.SubtractTokens(Cost_Value);
+                        if (__instance.M.GetNumTokens() < Cost_Value)
+                        {
+                            SM.PlayCoreSound(FVRPooledAudioType.UIChirp, __instance.AudEvent_Fail, __instance.transform.position);
+                            return false;
+                        }
                     }
                     if (Cost_Type == "Multiplier")
                     {
-                        __instance.M.SubtractTokens(3 * Cost_Value);
+                        if (__instance.M.GetNumTokens() < 3 * Cost_Value)
+                        {
+                            SM.PlayCoreSound(FVRPooledAudioType.UIChirp, __instance.AudEvent_Fail, __instance.transform.position);
+                            return false;
+                        }
                     }
-                    __instance.M.Increment(10, false);
-                    UnityEngine.Object.Destroy(m_detectedmag.GameObject);
-                    UnityEngine.Object.Instantiate<GameObject>(fvrobject.GetGameObject(), __instance.Spawnpoint_Mag.position, __instance.Spawnpoint_Mag.rotation);
-                    SM.PlayCoreSound(FVRPooledAudioType.UIChirp, __instance.AudEvent_Spawn, __instance.transform.position);
-                }
+                    if (__instance.M.GetNumTokens() < 0)
+                    {
+                        SM.PlayCoreSound(FVRPooledAudioType.UIChirp, __instance.AudEvent_Fail, __instance.transform.position);
+                        return false;
+                    }
+                    if (m_detectedmag == null)
+                    {
+                        SM.PlayCoreSound(FVRPooledAudioType.UIChirp, __instance.AudEvent_Fail, __instance.transform.position);
+                        return false;
+                    }
+                    if (!IM.CompatMags.ContainsKey(m_detectedmag.MagazineType))
+                    {
+                        SM.PlayCoreSound(FVRPooledAudioType.UIChirp, __instance.AudEvent_Fail, __instance.transform.position);
+                        return false;
+                    }
+                    List<FVRObject> list = IM.CompatMags[m_detectedmag.MagazineType];
+                    FVRObject fvrobject = null;
+                    int num = 10000;
+                    for (int i = 0; i < list.Count; i++)
+                    {
+                        if (!(list[i].ItemID == m_detectedmag.ObjectWrapper.ItemID) && list[i].MagazineCapacity > m_detectedmag.m_capacity && list[i].MagazineCapacity < num)
+                        {
+                            fvrobject = list[i];
+                            num = list[i].MagazineCapacity;
+                        }
+                    }
+                    if (fvrobject != null)
+                    {
+                        if (Cost_Type == "Flat")
+                        {
+                            __instance.M.SubtractTokens(Cost_Value);
+                        }
+                        if (Cost_Type == "Multiplier")
+                        {
+                            __instance.M.SubtractTokens(3 * Cost_Value);
+                        }
+                        __instance.M.Increment(10, false);
+                        UnityEngine.Object.Destroy(m_detectedmag.GameObject);
+                        UnityEngine.Object.Instantiate<GameObject>(fvrobject.GetGameObject(), __instance.Spawnpoint_Mag.position, __instance.Spawnpoint_Mag.rotation);
+                        SM.PlayCoreSound(FVRPooledAudioType.UIChirp, __instance.AudEvent_Spawn, __instance.transform.position);
+                    }
 
-                LoggerInstance.LogInfo("Casual TNH: Button_Upgrade method is patched.");
-                return false;
+                    LoggerInstance.LogInfo("Button_Upgrade method is patched.");
+                    return false;
+                }
+                LoggerInstance.LogInfo("Skipped patching Button_Upgrade method.");
+                return true;
             }
-            LoggerInstance.LogInfo("Casual TNH: Skipped patching Button_Upgrade method.");
-            return true;
         }
     }
 }
