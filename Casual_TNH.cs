@@ -80,7 +80,7 @@ namespace Casual_TNH
                 if (ShortAnalyze)
                 {
                     LoggerInstance.LogInfo("Beginning Postfix of BeginAnalyzing method.");
-                    FieldInfo m_curPhaseField = typeof(TNH_Manager).GetField("m_curPhase", BindingFlags.NonPublic | BindingFlags.Instance);
+                    FieldInfo m_curPhaseField = typeof(TNH_HoldPoint).GetField("m_curPhase", BindingFlags.NonPublic | BindingFlags.Instance);
                     if(m_curPhaseField == null)
                     {
                         LoggerInstance.LogInfo("m_curPhaseField is null, something is wrong.");
