@@ -17,7 +17,8 @@ namespace Casual_TNH
         private static ConfigEntry<int> MagUpgradeValue;
         private static ConfigEntry<string> MagUpgradeType;
         private static ConfigEntry<bool> ModifiedMagCostsEnabled;
-        private static ConfigEntry<bool> ShortenAnalyzePhases;
+        private static ConfigEntry<bool> ShorterAnalyzePhases;
+        private static ConfigEntry<float> TimeModifier;
         private static ConfigEntry<bool> IsRerollFree;
         private static ConfigEntry<int> TokenMultiplier;
         private Harmony harmony;
@@ -29,7 +30,8 @@ namespace Casual_TNH
             MagUpgradeValue = Config.Bind("Magazine Upgrade Costs", "Magazine_upgrade_cost", 0, "Value to used for calculating magazine upgrade costs.");
             MagUpgradeType = Config.Bind("Magazine Upgrade Costs", "Magazine_upgrade_cost_type", "Flat", "How you want to use \"Magazine_upgrade_cost\" value to calculate magazine upgrade costs. Set it to either \"Flat\" or \"Multiplier\".");
             ModifiedMagCostsEnabled = Config.Bind("Magazine Upgrade Costs", "Change_magazine_upgrade_costs", true, "If mod's magazine upgrade feature should be enabled or not. Set it to false if you don't want to use this.");
-            ShortenAnalyzePhases = Config.Bind("Shorter Analyze Phases", "Enabled", true, "If analyze phases should be shortened or not. Set it to false if you don't want to use this.");
+            ShorterAnalyzePhases = Config.Bind("Shorter Analyze Phases", "Enabled", true, "If analyze phases should be shortened or not. Set it to false if you don't want to use this.");
+            TimeModifier = Config.Bind("Shorter Analyze Phases", "Time_modifier", 0.33f, "Multiplier value used for calculating how long it takes for encryptions to appear. Lesser values means shorter times. \nRecommend values are between 0.25 to 0.75 for short analyze phases.");
             IsRerollFree = Config.Bind("Reroll Costs", "Rerolls_cost_nothing", true, "If rerolls should be free or not. Set it to false if you don't want to use this.");
             TokenMultiplier = Config.Bind("Token Multiplier", "Token_gains_multiplied_by", 5, "Multiplier for token modification. Set it to 1 if you don't want to use this.");
             harmony = new Harmony("Nepper.CasualTNH");
@@ -73,8 +75,9 @@ namespace Casual_TNH
         {
             static void Postfix(ref TNH_HoldPoint __instance)
             {
-                bool ShorterAnalyze = ShortenAnalyzePhases.Value;
-                if (ShorterAnalyze)
+                float timemodifier = TimeModifier.Value;
+                bool ShortAnalyze = ShorterAnalyzePhases.Value;
+                if (ShortAnalyze)
                 {
                     LoggerInstance.LogInfo("Beginning Postfix of BeginAnalyzing method.");
                     FieldInfo m_curPhaseField = typeof(TNH_Manager).GetField("m_curPhase", BindingFlags.NonPublic | BindingFlags.Instance);
@@ -88,13 +91,19 @@ namespace Casual_TNH
                         LoggerInstance.LogInfo("m_curphase is null, something is wrong.");
                     }
                     float scantime = m_curphase.ScanTime;
+                    if (scantime == null)
+                    {
+                        LoggerInstance.LogInfo("m_curphase.ScanTime is null, something is wrong.");
+                    }
+                    LoggerInstance.LogInfo("Scan time before mod: " + scantime);
 
                     FieldInfo m_tickDownToIdentificationField = typeof(TNH_HoldPoint).GetField("m_tickDownToIdentification", BindingFlags.NonPublic | BindingFlags.Instance);
                     if (m_tickDownToIdentificationField == null)
                     {
                         LoggerInstance.LogInfo("m_tickDownToIdentificationField is null, something is wrong.");
                     }
-                    float newscantime = UnityEngine.Random.Range(scantime * 0.32f, scantime * 0.34f) + 1f;
+                    float newscantime = scantime * timemodifier;
+                    LoggerInstance.LogInfo("Scan time after mod: " + newscantime);
                     m_tickDownToIdentificationField.SetValue(__instance, newscantime);
 
                     LoggerInstance.LogInfo("Ending Postfix of BeginAnalyzing method.");
