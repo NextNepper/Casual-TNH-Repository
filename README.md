@@ -1,7 +1,7 @@
 # Casual TNH
 This mod I've made for H3VR does the following when playing take and hold game mode:
 1. Allows you to multiply amount of tokens you earn(configurable in .cfg file).
-2. Shortens analyze phases so encryptions appear much very quickly(can be enabled and disabled in .cfg file).
+2. Shortens analyze phases so encryptions appear very quickly(can be enabled and disabled in .cfg file).
 3. Allows you to reroll items for free(can be enabled and disabled in .cfg file).
 4. Allows you to change cost of upgrading magazines(can be configured in .cfg file).
 
