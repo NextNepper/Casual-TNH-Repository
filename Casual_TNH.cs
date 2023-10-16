@@ -14,6 +14,8 @@ namespace Casual_TNH
     {
         private static Casual_TNH casual_tnh;
         private static ManualLogSource LoggerInstance;
+        private static ConfigEntry<int> MagCloneValue;
+        private static ConfigEntry<string> MagCloneType;
         private static ConfigEntry<int> MagUpgradeValue;
         private static ConfigEntry<string> MagUpgradeType;
         private static ConfigEntry<bool> ModifiedMagCostsEnabled;
@@ -27,13 +29,15 @@ namespace Casual_TNH
         {
             casual_tnh = this;
             LoggerInstance = Logger;
-            MagUpgradeValue = Config.Bind("Magazine Upgrade Costs", "Magazine_upgrade_cost", 0, "Value to used for calculating magazine upgrade costs.");
-            MagUpgradeType = Config.Bind("Magazine Upgrade Costs", "Magazine_upgrade_cost_type", "Flat", "How you want to use \"Magazine_upgrade_cost\" value to calculate magazine upgrade costs. Set it to either \"Flat\" or \"Multiplier\".");
-            ModifiedMagCostsEnabled = Config.Bind("Magazine Upgrade Costs", "Change_magazine_upgrade_costs", true, "If mod's magazine upgrade feature should be enabled or not. Set it to false if you don't want to use this.");
-            ShorterAnalyzePhases = Config.Bind("Shorter Analyze Phases", "Enabled", true, "If analyze phases should be shortened or not. Set it to false if you don't want to use this.");
-            TimeModifier = Config.Bind("Shorter Analyze Phases", "Time_modifier", 0.33f, "Multiplier value used for calculating how long it takes for encryptions to appear. Lesser values means shorter times. \nRecommend values are between 0.25 to 0.75 for short analyze phases.");
-            IsRerollFree = Config.Bind("Reroll Costs", "Rerolls_cost_nothing", true, "If rerolls should be free or not. Set it to false if you don't want to use this.");
-            TokenMultiplier = Config.Bind("Token Multiplier", "Token_gains_multiplied_by", 5, "Multiplier for token modification. Set it to 1 if you don't want to use this.");
+            MagCloneValue = Config.Bind("Modify Magazine Costs", "Magazine_clone_cost", 0, "Value to used for calculating magazine clone costs.");
+            MagCloneType = Config.Bind("Modify Magazine Costs", "Magazine_clone_cost_type", "Flat", "How you want to use \"Magazine_clone_cost\" value to calculate magazine clone costs. \nSet it to either \"Flat\" or \"Multiplier\". \nSet it to \"Multiplier\" and set \"Magazine_clone_cost\" to 1 if you don't want to use it.");
+            MagUpgradeValue = Config.Bind("Modify Magazine Costs", "Magazine_upgrade_cost", 0, "Value to used for calculating magazine upgrade costs.");
+            MagUpgradeType = Config.Bind("Modify Magazine Costs", "Magazine_upgrade_cost_type", "Flat", "How you want to use \"Magazine_upgrade_cost\" value to calculate magazine upgrade costs. \nSet it to either \"Flat\" or \"Multiplier\". \nSet it to \"Multiplier\" and set \"Magazine_upgrade_cost\" to 1 if you don't want to use it.");
+            ModifiedMagCostsEnabled = Config.Bind("Modify Magazine Costs", "Modify_magazine_costs", true, "If mod is allowed to change magazine upgrade and clone costs. Set it to false if you don't want to use it.");
+            ShorterAnalyzePhases = Config.Bind("Shorter Analyze Phases", "Modify_analyze_time", true, "If analyze phases should be shortened or not. Set it to false if you don't want to use it.");
+            TimeModifier = Config.Bind("Shorter Analyze Phases", "Time_modifier", 0.5f, "Multiplier value used for calculating how long it takes for encryptions to appear.\n Lesser values means shorter analyze phases. \nRecommend values are between 0.25 to 0.75 for short analyze phases.");
+            IsRerollFree = Config.Bind("Reroll Costs", "Rerolls_cost_nothing", true, "If rerolls should be free or not. Set it to false if you don't want to use it.");
+            TokenMultiplier = Config.Bind("Token Multiplier", "Token_gains_multiplied_by", 2, "Multiplier for token modification. Set it to 1 if you don't want to use it.");
             harmony = new Harmony("Nepper.CasualTNH");
             harmony.PatchAll();
         }
@@ -53,9 +57,9 @@ namespace Casual_TNH
                     if (currentNullableValue.HasValue)
                     {
                         int currentValue = currentNullableValue.Value;
-                        LoggerInstance.LogInfo("Token's you would get without this mod: " + i);
+                        LoggerInstance.LogInfo("Tokens you would get without this mod: " + i);
                         currentValue += i * Modifier;
-                        LoggerInstance.LogInfo("Token's you are going to get with this mod: " + i * Modifier);
+                        LoggerInstance.LogInfo("Tokens you are going to get with this mod: " + i * Modifier);
                         m_numTokensField.SetValue(__instance, currentValue);
                         if (Scorethis)
                         {
@@ -81,7 +85,7 @@ namespace Casual_TNH
                 {
                     LoggerInstance.LogInfo("Beginning Postfix of BeginAnalyzing method.");
                     FieldInfo m_curPhaseField = typeof(TNH_HoldPoint).GetField("m_curPhase", BindingFlags.NonPublic | BindingFlags.Instance);
-                    if(m_curPhaseField == null)
+                    if (m_curPhaseField == null)
                     {
                         LoggerInstance.LogInfo("m_curPhaseField is null, something is wrong.");
                     }
@@ -161,11 +165,19 @@ namespace Casual_TNH
             static bool Prefix(ref TNH_MagDuplicator __instance)
             {
                 bool isModifiedMagCostsEnabled = ModifiedMagCostsEnabled.Value;
-                if (isModifiedMagCostsEnabled)
+                if (isModifiedMagCostsEnabled == true)
                 {
                     LoggerInstance.LogInfo("Beginning to patch Button_Upgrade method.");
+                    int Cost_Value = 0;
                     string Cost_Type = MagUpgradeType.Value;
-                    int Cost_Value = MagUpgradeValue.Value;
+                    if (Cost_Type == "Flat")
+                    {
+                        Cost_Value = MagUpgradeValue.Value;
+                    }
+                    if (Cost_Type == "Multiplier")
+                    {
+                        Cost_Value = MagUpgradeValue.Value * 3;
+                    }
 
                     FieldInfo m_detectedMagField = typeof(TNH_MagDuplicator).GetField("m_detectedMag", BindingFlags.NonPublic | BindingFlags.Instance);
                     if (m_detectedMagField == null)
@@ -178,22 +190,12 @@ namespace Casual_TNH
                         LoggerInstance.LogInfo("m_detectedmag is null, something is wrong.");
                     }
 
-                    if (Cost_Type == "Flat")
+                    if (__instance.M.GetNumTokens() < Cost_Value)
                     {
-                        if (__instance.M.GetNumTokens() < Cost_Value)
-                        {
-                            SM.PlayCoreSound(FVRPooledAudioType.UIChirp, __instance.AudEvent_Fail, __instance.transform.position);
-                            return false;
-                        }
+                        SM.PlayCoreSound(FVRPooledAudioType.UIChirp, __instance.AudEvent_Fail, __instance.transform.position);
+                        return false;
                     }
-                    if (Cost_Type == "Multiplier")
-                    {
-                        if (__instance.M.GetNumTokens() < 3 * Cost_Value)
-                        {
-                            SM.PlayCoreSound(FVRPooledAudioType.UIChirp, __instance.AudEvent_Fail, __instance.transform.position);
-                            return false;
-                        }
-                    }
+
                     if (__instance.M.GetNumTokens() < 0)
                     {
                         SM.PlayCoreSound(FVRPooledAudioType.UIChirp, __instance.AudEvent_Fail, __instance.transform.position);
@@ -222,14 +224,9 @@ namespace Casual_TNH
                     }
                     if (fvrobject != null)
                     {
-                        if (Cost_Type == "Flat")
-                        {
-                            __instance.M.SubtractTokens(Cost_Value);
-                        }
-                        if (Cost_Type == "Multiplier")
-                        {
-                            __instance.M.SubtractTokens(3 * Cost_Value);
-                        }
+                        LoggerInstance.LogInfo("Tokens you would pay for upgrading magazine without this mod: 3");
+                        LoggerInstance.LogInfo("Tokens you are going to pay for upgrading magazine with this mod: " + Cost_Value);
+                        __instance.M.SubtractTokens(Cost_Value);
                         __instance.M.Increment(10, false);
                         UnityEngine.Object.Destroy(m_detectedmag.GameObject);
                         UnityEngine.Object.Instantiate<GameObject>(fvrobject.GetGameObject(), __instance.Spawnpoint_Mag.position, __instance.Spawnpoint_Mag.rotation);
@@ -240,6 +237,129 @@ namespace Casual_TNH
                     return false;
                 }
                 LoggerInstance.LogInfo("Skipped patching Button_Upgrade method.");
+                return true;
+            }
+        }
+
+        [HarmonyPatch(typeof(TNH_MagDuplicator), "Button_Duplicate")]
+        class ModifyMagazineCloneCost
+        {
+            static bool Prefix(ref TNH_MagDuplicator __instance)
+            {
+                bool isModifiedMagCostsEnabled = ModifiedMagCostsEnabled.Value;
+                if (isModifiedMagCostsEnabled == true)
+                {
+                    LoggerInstance.LogInfo("Beginning to patch Button_Duplicate method.");
+
+                    FieldInfo m_detectedMagField = typeof(TNH_MagDuplicator).GetField("m_detectedMag", BindingFlags.NonPublic | BindingFlags.Instance);
+                    if (m_detectedMagField == null)
+                    {
+                        LoggerInstance.LogInfo("m_detectedMagField is null, something is wrong.");
+                    }
+                    FVRFireArmMagazine m_detectedmag = (FVRFireArmMagazine)m_detectedMagField.GetValue(__instance);
+                    if (m_detectedmag == null)
+                    {
+                        LoggerInstance.LogInfo("m_detectedmag is null, something is wrong.");
+                    }
+
+                    FieldInfo m_detectedSLField = typeof(TNH_MagDuplicator).GetField("m_detectedSL", BindingFlags.NonPublic | BindingFlags.Instance);
+                    if (m_detectedMagField == null)
+                    {
+                        LoggerInstance.LogInfo("m_detectedSLField is null, something is wrong.");
+                    }
+                    Speedloader m_detectedsl = (Speedloader)m_detectedSLField.GetValue(__instance);
+                    if (m_detectedsl == null)
+                    {
+                        LoggerInstance.LogInfo("m_detectedsl is null, something is wrong.");
+                    }
+
+                    FieldInfo m_storedDupeCostField = typeof(TNH_MagDuplicator).GetField("m_storedDupeCost", BindingFlags.NonPublic | BindingFlags.Instance);
+                    if (m_detectedMagField == null)
+                    {
+                        LoggerInstance.LogInfo("m_storedDupeCostField is null, something is wrong.");
+                    }
+                    int m_storeddupecost = (int)m_storedDupeCostField.GetValue(__instance);
+                    if (m_storeddupecost == null)
+                    {
+                        LoggerInstance.LogInfo("m_storeddupecost is null, something is wrong.");
+                    }
+
+                    if (m_detectedmag == null && m_detectedsl == null)
+                    {
+                        SM.PlayCoreSound(FVRPooledAudioType.UIChirp, __instance.AudEvent_Fail, __instance.transform.position);
+                        return false;
+                    }
+                    if (m_detectedmag != null && m_detectedmag.IsEnBloc)
+                    {
+                        SM.PlayCoreSound(FVRPooledAudioType.UIChirp, __instance.AudEvent_Fail, __instance.transform.position);
+                        return false;
+                    }
+                    if (m_storeddupecost < 1)
+                    {
+                        SM.PlayCoreSound(FVRPooledAudioType.UIChirp, __instance.AudEvent_Fail, __instance.transform.position);
+                        return false;
+                    }
+
+                    LoggerInstance.LogInfo("Tokens you would pay for cloning magazine without this mod:" + m_storeddupecost);
+                    int Cost_Value = 0;
+                    string Cost_Type = MagCloneType.Value;
+                    if (Cost_Type == "Flat")
+                    {
+                        Cost_Value = MagCloneValue.Value;
+                    }
+                    if (Cost_Type == "Multiplier")
+                    {
+                        Cost_Value = MagCloneValue.Value * m_storeddupecost;
+                    }
+                    LoggerInstance.LogInfo("Tokens you are going to pay for cloning magazine with this mod:" + Cost_Value);
+
+                    if (__instance.M.GetNumTokens() >= Cost_Value)
+                    {
+                        SM.PlayCoreSound(FVRPooledAudioType.UIChirp, __instance.AudEvent_Spawn, __instance.transform.position);
+                        __instance.M.SubtractTokens(Cost_Value);
+                        __instance.M.Increment(10, false);
+                        if (m_detectedmag != null)
+                        {
+                            FVRObject objectWrapper = m_detectedmag.ObjectWrapper;
+                            GameObject gameObject = UnityEngine.Object.Instantiate<GameObject>(objectWrapper.GetGameObject(), __instance.Spawnpoint_Mag.position, __instance.Spawnpoint_Mag.rotation);
+                            FVRFireArmMagazine component = gameObject.GetComponent<FVRFireArmMagazine>();
+                            for (int i = 0; i < Mathf.Min(m_detectedmag.LoadedRounds.Length, component.LoadedRounds.Length); i++)
+                            {
+                                if (m_detectedmag.LoadedRounds[i] != null && m_detectedmag.LoadedRounds[i].LR_Mesh != null)
+                                {
+                                    component.LoadedRounds[i].LR_Class = m_detectedmag.LoadedRounds[i].LR_Class;
+                                    component.LoadedRounds[i].LR_Mesh = m_detectedmag.LoadedRounds[i].LR_Mesh;
+                                    component.LoadedRounds[i].LR_Material = m_detectedmag.LoadedRounds[i].LR_Material;
+                                    component.LoadedRounds[i].LR_ObjectWrapper = m_detectedmag.LoadedRounds[i].LR_ObjectWrapper;
+                                }
+                            }
+                            component.m_numRounds = m_detectedmag.m_numRounds;
+                            component.UpdateBulletDisplay();
+                        }
+                        else if (m_detectedsl != null)
+                        {
+                            FVRObject objectWrapper = m_detectedsl.ObjectWrapper;
+                            GameObject gameObject2 = UnityEngine.Object.Instantiate<GameObject>(objectWrapper.GetGameObject(), __instance.Spawnpoint_Mag.position, __instance.Spawnpoint_Mag.rotation);
+                            Speedloader component2 = gameObject2.GetComponent<Speedloader>();
+                            for (int j = 0; j < m_detectedsl.Chambers.Count; j++)
+                            {
+                                if (m_detectedsl.Chambers[j].IsLoaded)
+                                {
+                                    component2.Chambers[j].Load(m_detectedsl.Chambers[j].LoadedClass, false);
+                                }
+                                else
+                                {
+                                    component2.Chambers[j].Unload();
+                                }
+                            }
+                        }
+                        LoggerInstance.LogInfo("Button_Duplicate method is patched.");
+                        return false;
+                    }
+                    SM.PlayCoreSound(FVRPooledAudioType.UIChirp, __instance.AudEvent_Fail, __instance.transform.position);
+                    return false;
+                }
+                LoggerInstance.LogInfo("Skipped patching Button_Duplicate method.");
                 return true;
             }
         }
