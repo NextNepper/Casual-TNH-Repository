@@ -68,6 +68,10 @@ namespace Casual_TNH
                         __instance.OnTokenCountChange(currentValue);
                     }
                 }
+                else
+                {
+                    LoggerInstance.LogInfo("m_numTokensField is null, something is wrong.");
+                }
                 LoggerInstance.LogInfo("Patched AddTokens method!");
 
                 return false;
@@ -140,11 +144,19 @@ namespace Casual_TNH
                             m_pooladdedcost[which] = 0;
                             m_poolAddedCostField.SetValue(__instance, m_pooladdedcost);
                         }
+                        else
+                        {
+                            LoggerInstance.LogInfo("m_poolAddedCostField is null, something is wrong.");
+                        }
 
                         MethodInfo updateTokenDisplayMethod = typeof(TNH_ObjectConstructor).GetMethod("UpdateTokenDisplay", BindingFlags.NonPublic | BindingFlags.Instance);
                         if (updateTokenDisplayMethod != null)
                         {
                             updateTokenDisplayMethod.Invoke(__instance, new object[] { __instance.M.GetNumTokens() });
+                        }
+                        else
+                        {
+                            LoggerInstance.LogInfo("updateTokenDisplayMethod is null, something is wrong.");
                         }
 
                         LoggerInstance.LogInfo("ButtonClicked_Reroll method is patched.");
