@@ -221,6 +221,79 @@ namespace Casual_TNH
             }
         }
 
+        [HarmonyPatch(typeof(TNH_ObjectConstructor), "ButtonClicked_Unlock")]
+        class ModifyUnlockCost
+        {
+            static bool Prefix(ref TNH_ObjectConstructor __instance, int which)
+            {
+                bool isRerollFree = IsRerollFree.Value;
+                if (isRerollFree)
+                {
+                    LoggerInstance.LogInfo("Beginning to patch ButtonClicked_Unlock method.");
+                    int num = 0;
+                    int numTokens = __instance.M.GetNumTokens();
+                    if (numTokens >= num)
+                    {
+                        SM.PlayCoreSound(FVRPooledAudioType.UIChirp, __instance.AudEvent_Select, __instance.transform.position);
+
+                        MethodInfo UnlockPoolCategoryMethod = typeof(TNH_ObjectConstructor).GetMethod("UnlockPoolCategory", BindingFlags.NonPublic | BindingFlags.Instance);
+                        if (UnlockPoolCategoryMethod != null)
+                        {
+                            UnlockPoolCategoryMethod.Invoke(__instance, new object[] { which });
+                        }
+                        else
+                        {
+                            LoggerInstance.LogInfo("UnlockPoolCategoryMethod is null, something is wrong.");
+                        }
+
+                        MethodInfo SetStateMethod = typeof(TNH_ObjectConstructor).GetMethod("SetState", BindingFlags.NonPublic | BindingFlags.Instance);
+                        if (SetStateMethod != null)
+                        {
+                            SetStateMethod.Invoke(__instance, new object[] { TNH_ObjectConstructor.ConstructorState.EntryList, 0 });
+                        }
+                        else
+                        {
+                            LoggerInstance.LogInfo("SetStateMethod is null, something is wrong.");
+                        }
+
+                        __instance.M.SubtractTokens(num);
+
+                        MethodInfo updateTokenDisplayMethod = typeof(TNH_ObjectConstructor).GetMethod("UpdateTokenDisplay", BindingFlags.NonPublic | BindingFlags.Instance);
+                        if (updateTokenDisplayMethod != null)
+                        {
+                            updateTokenDisplayMethod.Invoke(__instance, new object[] { __instance.M.GetNumTokens() });
+                        }
+                        else
+                        {
+                            LoggerInstance.LogInfo("updateTokenDisplayMethod is null, something is wrong.");
+                        }
+
+                        LoggerInstance.LogInfo("ButtonClicked_Unlock method is patched.");
+                        return false;
+                    }
+                    else
+                    {
+                        SM.PlayCoreSound(FVRPooledAudioType.UIChirp, __instance.AudEvent_Fail, __instance.transform.position);
+                    }
+
+                    MethodInfo UpdateLockUnlockButtonStateMethod = typeof(TNH_ObjectConstructor).GetMethod("UpdateLockUnlockButtonState", BindingFlags.NonPublic | BindingFlags.Instance);
+                    if (UpdateLockUnlockButtonStateMethod != null)
+                    {
+                        UpdateLockUnlockButtonStateMethod.Invoke(__instance, new object[] { false });
+                    }
+                    else
+                    {
+                        LoggerInstance.LogInfo("UpdateLockUnlockButtonStateMethod is null, something is wrong.");
+                    }
+
+                    LoggerInstance.LogInfo("ButtonClicked_Unlock method is patched.");
+                    return false;
+                }
+                LoggerInstance.LogInfo("Skipped patching ButtonClicked_Unlock method.");
+                return true;
+            }
+        }
+
         [HarmonyPatch(typeof(TNH_MagDuplicator), "Button_Upgrade")]
         class ModifyMagazineUpgradeCost
         {
