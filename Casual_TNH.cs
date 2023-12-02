@@ -6,11 +6,10 @@ using BepInEx.Configuration;
 using BepInEx.Logging;
 using HarmonyLib;
 using FistVR;
-using System.Runtime.InteropServices;
 
 namespace Casual_TNH
 {
-    [BepInPlugin("Nepper.CasualTNH", "Casual TNH", "1.0.0")]
+    [BepInPlugin("Nepper.CasualTNH", "Casual TNH", "1.0.1")]
     public class Casual_TNH : BaseUnityPlugin
     {
         private static Casual_TNH casual_tnh;

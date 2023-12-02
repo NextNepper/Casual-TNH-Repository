@@ -9,7 +9,7 @@ This mod I've made for H3VR does the following when playing take and hold game m
 Note: This mod was written on 16/10/2023 and was updated on 02/12/2023(Update 111 - INSTITUTION).
 If it doesn't work game might have received updates so mod might need to be updated as well.
 
-### [Source Code](https://github.com/NextNepper/Casual-TNH-Repository/tree/main)
+### [Source Code](Casual_TNH.cs)
 You'll need some dependency .dll files, import them to your project or code won't work:
 * BepInEx.dll from BepInEx/core
 * 0Harmony.dll from BepInEx/core
